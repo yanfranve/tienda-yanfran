@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { getProducts, getProductQuantities } from '@/api/EcommerceApi';
-import { useCart } from '@/hooks/useCart.jsx'; // 🔥 IMPORTANTE
+import { collection, getDocs, query, where, limit } from "firebase/firestore";
+import { db } from "@/firebase/config.js";
+import { useCart } from '@/hooks/useCart.jsx';
 import ProductCard from '@/components/ProductCard.jsx';
 
 const ProductsList = ({ setIsCartOpen }) => {
@@ -11,53 +11,56 @@ const ProductsList = ({ setIsCartOpen }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const navigate = useNavigate();
-  const { addToCart } = useCart(); // 🔥 IMPORTANTE
+  const { addToCart } = useCart();
 
   useEffect(() => {
-    const fetchProductsWithQuantities = async () => {
+    const fetchProducts = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const productsResponse = await getProducts({ limit: 8 });
+        const q = query(
+          collection(db, "products_store"),
+          where("active", "==", true),
+          limit(8)
+        );
 
-        if (productsResponse.products.length === 0) {
-          setProducts([]);
-          return;
-        }
+        const snapshot = await getDocs(q);
 
-        const productIds = productsResponse.products.map(product => product.id);
+        const data = snapshot.docs.map(doc => {
+          const product = doc.data();
 
-        const quantitiesResponse = await getProductQuantities({
-          fields: 'inventory_quantity',
-          product_ids: productIds
+          return {
+            id: doc.id,
+            title: product.name,
+            image: product.images?.[0] || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80",
+            ribbon_text: null,
+
+            // 🔥 Variantes reales desde Firebase
+            variants: (product.variants || []).map(variant => ({
+              id: variant.id,
+              price_in_cents: variant.price * 100,
+              sale_price_in_cents: null,
+              inventory_quantity: variant.stock,
+              size: variant.size,
+              color: variant.color
+            }))
+          };
         });
 
-        const variantQuantityMap = new Map();
-        quantitiesResponse.variants.forEach(variant => {
-          variantQuantityMap.set(variant.id, variant.inventory_quantity);
-        });
+        setProducts(data);
 
-        const productsWithQuantities = productsResponse.products.map(product => ({
-          ...product,
-          variants: product.variants.map(variant => ({
-            ...variant,
-            inventory_quantity: variantQuantityMap.get(variant.id) ?? variant.inventory_quantity
-          }))
-        }));
-
-        setProducts(productsWithQuantities);
       } catch (err) {
-        setError(err.message || 'Error al cargar los productos');
+        setError(err.message || "Error al cargar productos");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProductsWithQuantities();
+    fetchProducts();
   }, []);
 
+  // 🔄 LOADING
   if (loading) {
     return (
       <div className="flex flex-col justify-center items-center py-20">
@@ -67,6 +70,7 @@ const ProductsList = ({ setIsCartOpen }) => {
     );
   }
 
+  // ❌ ERROR
   if (error) {
     return (
       <div className="text-center py-20 bg-destructive/10 rounded-2xl border border-destructive/20">
@@ -81,31 +85,25 @@ const ProductsList = ({ setIsCartOpen }) => {
     );
   }
 
+  // 📦 VACÍO
   if (products.length === 0) {
     return (
       <div className="text-center py-20 bg-muted rounded-2xl border border-border">
-        <p className="text-muted-foreground">No hay productos disponibles en este momento.</p>
+        <p className="text-muted-foreground">No hay productos disponibles.</p>
       </div>
     );
   }
 
+  // 🛒 LISTA
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
       {products.map((product, index) => {
 
-        const defaultVariant = product.variants[0];
+        const defaultVariant = product.variants?.[0];
 
-        const originalPrice = defaultVariant?.price_in_cents 
-          ? defaultVariant.price_in_cents / 100 
-          : null;
+        if (!defaultVariant) return null;
 
-        const discountedPrice = defaultVariant?.sale_price_in_cents 
-          ? defaultVariant.sale_price_in_cents / 100 
-          : originalPrice;
-
-        const finalOriginalPrice = defaultVariant?.sale_price_in_cents 
-          ? originalPrice 
-          : null;
+        const originalPrice = defaultVariant.price_in_cents / 100;
 
         return (
           <motion.div
@@ -117,24 +115,19 @@ const ProductsList = ({ setIsCartOpen }) => {
           >
             <ProductCard
               id={product.id}
-              image={product.image || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80"}
+              image={product.image}
               name={product.title}
-              originalPrice={finalOriginalPrice}
-              discountedPrice={discountedPrice}
+              originalPrice={null}
+              discountedPrice={originalPrice}
               urgencyText={
-                product.ribbon_text || 
-                (defaultVariant?.inventory_quantity < 5 
-                  ? 'Últimas unidades' 
-                  : 'Disponible')
+                defaultVariant.inventory_quantity < 5
+                  ? 'Últimas unidades'
+                  : 'Disponible'
               }
 
-              // 🔥 CLAVE PARA BOTÓN INTELIGENTE
               variants={product.variants}
 
-              // 🔥 COMPRA REAL
               onBuyClick={async () => {
-                if (!defaultVariant) return;
-
                 await addToCart(
                   product,
                   defaultVariant,
@@ -142,10 +135,12 @@ const ProductsList = ({ setIsCartOpen }) => {
                   defaultVariant.inventory_quantity
                 );
 
-                // 🔥 abre carrito
+                // 🔥 abrir carrito
                 window.dispatchEvent(new CustomEvent("add-to-cart", {
                   detail: { id: product.id }
                 }));
+
+                if (setIsCartOpen) setIsCartOpen(true);
               }}
             />
           </motion.div>

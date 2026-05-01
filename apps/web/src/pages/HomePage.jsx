@@ -10,6 +10,7 @@ import TestimonialCard from '@/components/TestimonialCard.jsx';
 import FloatingWhatsAppButton from '@/components/FloatingWhatsAppButton.jsx';
 import { Button } from '@/components/ui/button';
 
+
 const HomePage = ({ setIsCartOpen }) => {
   const navigate = useNavigate();
 
@@ -78,6 +79,7 @@ const HomePage = ({ setIsCartOpen }) => {
       <Helmet>
         <title>Yanfran - Soluciones digitales y productos de calidad en Chile</title>
         <meta name="description" content="Impulsa tu negocio con productos de calidad y servicios digitales profesionales. Entrega rápida en Chile, pago seguro y soporte por WhatsApp." />
+             
       </Helmet>
 
       {/* Hero Section */}
