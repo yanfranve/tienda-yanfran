@@ -8,6 +8,9 @@ import FloatingWhatsAppButton from '@/components/FloatingWhatsAppButton.jsx';
 import HomePage from '@/pages/HomePage.jsx';
 import ProductDetailPage from '@/pages/ProductDetailPage.jsx';
 import SuccessPage from '@/pages/SuccessPage.jsx';
+import Register from "./pages/Register";
+import Checkout from "./pages/Checkout";
+import Login from "./pages/Login";
 
 const Layout = ({ children }) => {
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -50,6 +53,9 @@ function App() {
           <Route path="/product/:id" element={<ProductDetailPage />} />
           <Route path="/success" element={<SuccessPage />} />
           <Route path="*" element={<HomePage />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/login" element={<Login />} />
         </Routes>
       </Layout>
     </Router>
